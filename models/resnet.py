@@ -73,11 +73,11 @@ class BottleNeck(chainer.Chain):
 
 class Block(chainer.ChainList):
 
-    def __init__(self, n_in, n_mid, n_out, n_bottlenecks, stride=2):
+    def __init__(self, n_in, n_mid, n_out, n_bottlenecks, stride=2, add_seblock=False):
         super(Block, self).__init__()
-        self.add_link(BottleNeck(n_in, n_mid, n_out, stride, True))
+        self.add_link(BottleNeck(n_in, n_mid, n_out, stride, True, add_seblock))
         for _ in range(n_bottlenecks - 1):
-            self.add_link(BottleNeck(n_out, n_mid, n_out))
+            self.add_link(BottleNeck(n_out, n_mid, n_out, False, add_seblock))
 
     def __call__(self, x):
         for f in self:
@@ -87,16 +87,16 @@ class Block(chainer.ChainList):
 
 class ResNet(chainer.Chain):
 
-    def __init__(self, n_class=10, n_blocks=[3, 4, 6, 3]):
+    def __init__(self, n_class=10, n_blocks=[3, 4, 6, 3], add_seblock=False):
         super(ResNet, self).__init__()
         w = chainer.initializers.HeNormal()
         with self.init_scope():
             self.conv1 = L.Convolution2D(None, 64, 3, 1, 0, True, w)
             self.bn2 = L.BatchNormalization(64)
-            self.res3 = Block(64, 64, 256, n_blocks[0], 1)
-            self.res4 = Block(256, 128, 512, n_blocks[1], 2)
-            self.res5 = Block(512, 256, 1024, n_blocks[2], 2)
-            self.res6 = Block(1024, 512, 2048, n_blocks[3], 2)
+            self.res3 = Block(64, 64, 256, n_blocks[0], 1, add_seblock)
+            self.res4 = Block(256, 128, 512, n_blocks[1], 2, add_seblock)
+            self.res5 = Block(512, 256, 1024, n_blocks[2], 2, add_seblock)
+            self.res6 = Block(1024, 512, 2048, n_blocks[3], 2, add_seblock)
             self.fc7 = L.Linear(None, n_class)
 
     def __call__(self, x):
@@ -112,20 +112,20 @@ class ResNet(chainer.Chain):
 
 class ResNet50(ResNet):
 
-    def __init__(self, n_class=10):
-        super(ResNet50, self).__init__(n_class, [3, 4, 6, 3])
+    def __init__(self, n_class=10, add_seblock=False):
+        super(ResNet50, self).__init__(n_class, [3, 4, 6, 3], add_seblock)
 
 
 class ResNet101(ResNet):
 
-    def __init__(self, n_class=10):
-        super(ResNet101, self).__init__(n_class, [3, 4, 23, 3])
+    def __init__(self, n_class=10, add_seblock=False):
+        super(ResNet101, self).__init__(n_class, [3, 4, 23, 3], add_seblock)
 
 
 class ResNet152(ResNet):
 
-    def __init__(self, n_class=10):
-        super(ResNet152, self).__init__(n_class, [3, 8, 36, 3])
+    def __init__(self, n_class=10, add_seblock=False):
+        super(ResNet152, self).__init__(n_class, [3, 8, 36, 3], add_seblock)
 
 
 if __name__ == '__main__':
