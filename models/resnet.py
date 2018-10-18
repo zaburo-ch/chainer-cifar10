@@ -77,7 +77,7 @@ class Block(chainer.ChainList):
         super(Block, self).__init__()
         self.add_link(BottleNeck(n_in, n_mid, n_out, stride, True, add_seblock))
         for _ in range(n_bottlenecks - 1):
-            self.add_link(BottleNeck(n_out, n_mid, n_out, False, add_seblock))
+            self.add_link(BottleNeck(n_out, n_mid, n_out, add_seblock=add_seblock))
 
     def __call__(self, x):
         for f in self:
