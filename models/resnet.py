@@ -3,9 +3,47 @@ import chainer.functions as F
 import chainer.links as L
 
 
+# https://github.com/zaburo-ch/chainercv/blob/master/chainercv/links/connection/seblock.py
+class SEBlock(chainer.Chain):
+
+    """A squeeze-and-excitation block.
+    This block is part of squeeze-and-excitation networks. Channel-wise
+    multiplication weights are inferred from and applied to input feature map.
+    Please refer to `the original paper
+    <https://arxiv.org/pdf/1709.01507.pdf>`_ for more details.
+    .. seealso::
+        :class:`chainercv.links.model.senet.SEResNet`
+    Args:
+        n_channel (int): The number of channels of the input and output array.
+        ratio (int): Reduction ratio of :obj:`n_channel` to the number of
+            hidden layer units.
+    """
+
+    def __init__(self, n_channel, ratio=16):
+
+        super(SEBlock, self).__init__()
+        reduction_size = n_channel // ratio
+
+        with self.init_scope():
+            self.down = L.Linear(n_channel, reduction_size)
+            self.up = L.Linear(reduction_size, n_channel)
+
+    def __call__(self, u):
+        B, C, H, W = u.shape
+
+        z = F.average(u, axis=(2, 3))
+        x = F.relu(self.down(z))
+        x = F.sigmoid(self.up(x))
+
+        x = F.broadcast_to(x, (H, W, B, C))
+        x = x.transpose((2, 3, 0, 1))
+
+        return u * x
+
+
 class BottleNeck(chainer.Chain):
 
-    def __init__(self, n_in, n_mid, n_out, stride=1, use_conv=False):
+    def __init__(self, n_in, n_mid, n_out, stride=1, use_conv=False, add_seblock=False):
         w = chainer.initializers.HeNormal()
         super(BottleNeck, self).__init__()
         with self.init_scope():
@@ -15,16 +53,21 @@ class BottleNeck(chainer.Chain):
             self.bn2 = L.BatchNormalization(n_mid)
             self.conv3 = L.Convolution2D(n_mid, n_out, 1, 1, 0, True, w)
             self.bn3 = L.BatchNormalization(n_out)
+            if add_seblock:
+                self.se = SEBlock(n_out)
             if use_conv:
                 self.conv4 = L.Convolution2D(
                     n_in, n_out, 1, stride, 0, True, w)
                 self.bn4 = L.BatchNormalization(n_out)
         self.use_conv = use_conv
+        self.add_seblock = add_seblock
 
     def __call__(self, x):
         h = F.relu(self.bn1(self.conv1(x)))
         h = F.relu(self.bn2(self.conv2(h)))
         h = self.bn3(self.conv3(h))
+        if self.add_seblock:
+            h = self.se(h)
         return h + self.bn4(self.conv4(x)) if self.use_conv else h + x
 
 
